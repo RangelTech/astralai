@@ -105,19 +105,19 @@ def test_admin_login_e_skill(tmp_path):
     cfg = Config(dados=str(tmp_path), segredo_sessao="s", dev=True)
     vistos = []
     app = criar_app(cfg, llm=lambda m: (vistos.append(m), "ok")[1], geocod=geo_falso)
-    app.router.routes[:] = [r for r in app.router.routes if not getattr(r, "path", "").startswith("/api/admin")]
+    app.router.routes[:] = [r for r in app.router.routes if not getattr(r, "path", "").startswith("/api/painel")]
     app.include_router(admin.rotas(app.state.db, "s", "SELECT email, criado, 0 ativo FROM usuarios", usuario="lucas", senha="segredo", seguro=False))
     a = TestClient(app)
-    assert a.get("/api/admin/skills").status_code == 401
-    assert a.post("/api/admin/entrar", json={"usuario": "lucas", "senha": "errada"}).status_code == 401
-    assert a.post("/api/admin/entrar", json={"usuario": "lucas", "senha": "segredo"}).status_code == 200
-    assert [s["nome"] for s in a.get("/api/admin/skills").json()["skills"]] == ["astral-ai"]
-    a.put("/api/admin/skills/astral-ai", json={"conteudo": "SKILL NOVA DO LUCAS"})
-    s = a.get("/api/admin/skills/astral-ai").json()
+    assert a.get("/api/painel/skills").status_code == 401
+    assert a.post("/api/painel/entrar", json={"usuario": "lucas", "senha": "errada"}).status_code == 401
+    assert a.post("/api/painel/entrar", json={"usuario": "lucas", "senha": "segredo"}).status_code == 200
+    assert [s["nome"] for s in a.get("/api/painel/skills").json()["skills"]] == ["astral-ai"]
+    a.put("/api/painel/skills/astral-ai", json={"conteudo": "SKILL NOVA DO LUCAS"})
+    s = a.get("/api/painel/skills/astral-ai").json()
     assert s["conteudo"] == "SKILL NOVA DO LUCAS" and len(s["historico"]) == 1 and s["por"] == "painel"
     cod = a.post("/api/entrar/codigo", json={"email": "z@x.com"}).json()["codigo_dev"]
     a.post("/api/entrar", json={"email": "z@x.com", "codigo": cod})
     a.post("/api/conversa", json={"texto": "oi"})
     assert "SKILL NOVA DO LUCAS" in vistos[-1][0]["content"]
-    assert a.post("/api/admin/skills/astral-ai/restaurar").json()["ok"] and "baralho cigano" in a.get("/api/admin/skills/astral-ai").json()["conteudo"].lower()
-    assert a.get("/api/admin/resumo").json()["total"] == 1
+    assert a.post("/api/painel/skills/astral-ai/restaurar").json()["ok"] and "baralho cigano" in a.get("/api/painel/skills/astral-ai").json()["conteudo"].lower()
+    assert a.get("/api/painel/resumo").json()["total"] == 1
