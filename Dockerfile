@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN mkdir -p /srv/efem && python -c "from skyfield.api import Loader; Loader('/srv/efem')('de421.bsp')"
 COPY app ./app
 COPY static ./static
+COPY skills ./skills
 ARG GIT_COMMIT=dev
 ENV GIT_COMMIT=${GIT_COMMIT} PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 ASTRALAI_DADOS=/data ASTRALAI_EFEM=/srv/efem HOME=/tmp
 USER 10001
