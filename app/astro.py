@@ -60,6 +60,19 @@ def numerologia(nome: str, nascimento: dt.date) -> dict:
     return {**nums, "significados": {k: SIGNIFICADO.get(v, "") for k, v in nums.items()}}
 
 
+ANIMAIS_CHINESES = ["Rato", "Boi", "Tigre", "Coelho", "Dragão", "Serpente", "Cavalo", "Cabra", "Macaco", "Galo", "Cão", "Porco"]
+ELEMENTOS_CHINESES = ["Metal", "Metal", "Água", "Água", "Madeira", "Madeira", "Fogo", "Fogo", "Terra", "Terra"]
+
+
+def signo_chines(ano: int, mes: int = 6, dia: int = 1) -> dict:
+    """Animal e elemento do horóscopo chinês. Antes de ~4 de fevereiro conta o ano anterior (Ano Novo chinês varia
+    de 21/01 a 20/02; nascidos nessa janela recebem o aviso)."""
+    a = ano - 1 if (mes, dia) < (2, 4) else ano
+    out = {"animal": ANIMAIS_CHINESES[(a - 2020) % 12], "elemento": ELEMENTOS_CHINESES[a % 10], "ano_chines": a}
+    out["aviso"] = "nasceu perto do Ano Novo chinês: confirme a data exata do ano" if (1, 21) <= (mes, dia) <= (2, 20) else ""
+    return out
+
+
 # ------------------------------------------------------------------ mapa astral
 EFEM = Path(__import__("os").environ.get("ASTRALAI_EFEM", Path(__file__).resolve().parent.parent / "efem"))
 CORPOS = [("Sol", "sun"), ("Lua", "moon"), ("Mercúrio", "mercury"), ("Vênus", "venus"), ("Marte", "mars"),

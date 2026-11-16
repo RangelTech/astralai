@@ -136,6 +136,14 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
         pl = ", ".join(f"{n} em {p['signo']} {p['grau']}° (casa {p['casa']})" for n, p in m["planetas"].items())
         return f"Ascendente {m['ascendente']['signo']} {m['ascendente']['grau']}°, Meio do Céu {m['meio_do_ceu']['signo']}; {pl}"
 
+    def chines(nasc: str) -> str:
+        try:
+            d = dt.date.fromisoformat(nasc)
+        except (TypeError, ValueError):
+            return "?"
+        c = astro.signo_chines(d.year, d.month, d.day)
+        return f"{c['animal']} de {c['elemento']}" + (f" ({c['aviso']})" if c["aviso"] else "")
+
     def contexto(u: dict) -> str:
         p = perfil_principal(u)
         if not p:
@@ -144,7 +152,8 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
         n = v["numerologia"] or {}
         return (f"Pessoa: {v['nome']}, nascida em {v['nascimento']}{' às ' + v['hora'] if v['hora'] else ''}{' em ' + v['cidade'] if v['cidade'] else ''}.\n"
                 f"Numerologia: destino {n.get('destino')}, expressão {n.get('expressao')}, alma {n.get('alma')}, personalidade {n.get('personalidade')}, ano pessoal {n.get('ano_pessoal')}.\n"
-                f"Mapa: {resumo_mapa(v['mapa'])}.\nPlano: {plano_de(u) or 'grátis'}.")
+                f"Mapa: {resumo_mapa(v['mapa'])}.\n"
+                f"Horóscopo chinês (calculado, use este): {chines(v['nascimento'])}.\nPlano: {plano_de(u) or 'grátis'}.")
 
     CEU: dict = {}
 
