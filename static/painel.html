@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Painel · Astral AI</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2314102b'/><path d='M32 10l5 15h16l-13 9 5 16-13-10-13 10 5-16-13-9h16z' fill='%23c9a7ff'/></svg>">
+<link rel="stylesheet" href="/s/estilo.css">
+<link rel="stylesheet" href="/s/cinema.css">
+<style>
+:root{--marca:#b78bff;--bg:#06050d;--bg2:#0c0a19;--card:#13102a;--bd:#251f45}
+body{background:radial-gradient(1000px 500px at 80% -10%,rgba(183,139,255,.14),transparent 60%),var(--bg)}
+.topo{background:rgba(6,5,13,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--bd)}
+.abas{display:flex;gap:4px;background:var(--card);border:1px solid var(--bd);border-radius:999px;padding:4px}
+.abas button{background:none;border:0;color:var(--mut);padding:8px 16px;border-radius:999px;font:inherit;font-weight:600;cursor:pointer}
+.abas button[aria-selected=true]{background:#241d4a;color:#fff}
+main.p{width:min(1100px,100%);margin:0 auto;padding:96px 24px 80px}
+.cartao{background:var(--card);border:1px solid var(--bd);border-radius:24px;padding:24px;margin-bottom:16px}
+.chat{display:flex;flex-direction:column;gap:10px;min-height:340px;max-height:56vh;overflow:auto;padding:4px}
+.b{padding:12px 16px;border-radius:18px;max-width:82%;font-size:15px;line-height:1.55;white-space:pre-wrap}
+.b.usuario{background:#1c1838;align-self:flex-end;border-bottom-right-radius:6px}
+.b.ia{background:linear-gradient(135deg,rgba(183,139,255,.2),rgba(183,139,255,.06));border:1px solid rgba(183,139,255,.28);border-bottom-left-radius:6px}
+.envio{display:flex;gap:8px;margin-top:12px}
+.envio input,.campo input,.campo select,.campo textarea{flex:1;background:#0b0918;border:1px solid var(--bd);border-radius:12px;padding:13px 14px;color:var(--fg);font:inherit;width:100%}
+.campo{display:grid;gap:6px;margin-bottom:12px}.campo label{font-size:14px;color:var(--mut)}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.chips button{background:#1a1636;border:1px solid var(--bd);color:#e0d8ff;border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;cursor:pointer}
+.planetas{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.planetas div{background:#0b0918;border:1px solid var(--bd);border-radius:14px;padding:12px}
+.planetas b{display:block;font-size:13px;color:var(--mut)}.planetas span{font-size:17px;font-weight:700}
+.nums{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.nums div{background:#0b0918;border:1px solid var(--bd);border-radius:14px;padding:12px;text-align:center}
+.nums b{display:block;font-size:30px;font-weight:900;color:var(--ac2)}.nums small{color:var(--mut)}
+.cartas{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}
+.carta{width:118px;aspect-ratio:2/3.4;border-radius:14px;background:linear-gradient(160deg,#2a1f5c,#120e26);border:1px solid #3b2f77;display:grid;place-items:center;text-align:center;padding:10px;font-weight:800;font-size:13px}
+.carta.inv{transform:rotate(180deg)}.carta small{display:block;font-weight:500;color:var(--mut);margin-top:6px}
+.leitura{white-space:pre-wrap;line-height:1.6;color:#e8e3fb}
+.cab{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.msg.erro{color:#f87171}.msg{min-height:20px;font-size:14px;margin-top:8px}
+@media (max-width:760px){.nums{grid-template-columns:repeat(3,1fr)}.duas{grid-template-columns:1fr}.abas{overflow:auto}}
+</style>
+</head>
+<body>
+<header class="topo"><div class="wrap">
+  <a class="logo" href="/painel"><i>✦</i>Astral AI</a>
+  <nav class="abas" role="tablist">
+    <button data-aba="conversa" aria-selected="true">Conversa</button><button data-aba="mapa">Meu mapa</button><button data-aba="tarot">Tarô</button><button data-aba="leituras">Leituras</button><button data-aba="plano">Plano</button>
+  </nav>
+  <div style="display:flex;gap:8px"><button class="btn btn-ghost" data-senha>Senha</button><button class="btn btn-ghost" id="sair">Sair</button></div>
+</div></header>
+<main class="p">
+  <section data-painel="conversa">
+    <div class="cartao" id="aviso-perfil" hidden><b>Comece pelos seus dados de nascimento.</b> <span class="dim">Com eles a Astral AI calcula a sua numerologia e o seu mapa.</span> <button class="btn btn-pri" data-ir="mapa" style="margin-left:8px">Preencher</button></div>
+    <div class="cartao">
+      <div class="cab"><h2 style="font-size:22px">Converse com a Astral AI</h2><button class="btn btn-sec" id="carta-dia">Minha carta do dia</button></div>
+      <div class="chips"><button>O que o meu número de destino diz?</button><button>Como está o meu ano pessoal?</button><button>O que o meu Ascendente mostra?</button><button>Me dá um conselho para hoje</button></div>
+      <div class="chat" id="chat"></div>
+      <form class="envio" id="f-chat"><input id="chat-txt" placeholder="Pergunte sobre amor, trabalho, propósito…" autocomplete="off"><button class="btn btn-pri">Enviar</button></form>
+      <div class="msg" id="chat-msg"></div>
+    </div>
+  </section>
+  <section data-painel="mapa" hidden>
+    <div class="cartao"><h2 style="font-size:22px;margin-bottom:12px">Seus dados de nascimento</h2>
+      <form id="f-perfil"><div class="campo"><label for="p-nome">Nome completo</label><input id="p-nome" required></div>
+        <div class="duas"><div class="campo"><label for="p-data">Data</label><input id="p-data" type="date" required></div><div class="campo"><label for="p-hora">Hora (opcional, para o Ascendente)</label><input id="p-hora" type="time"></div></div>
+        <div class="campo"><label for="p-cidade">Cidade de nascimento</label><input id="p-cidade" placeholder="Ex.: Goiânia, GO"></div>
+        <button class="btn btn-pri">Calcular</button><div class="msg" id="p-msg"></div></form></div>
+    <div id="meu-mapa"></div>
+  </section>
+  <section data-painel="tarot" hidden>
+    <div class="cartao"><h2 style="font-size:22px">Tiragem de tarô</h2><p class="dim" style="margin:6px 0 12px">Pense na sua pergunta com calma antes de tirar as cartas.</p>
+      <form id="f-tarot"><div class="campo"><label for="t-perg">Sua pergunta</label><input id="t-perg" placeholder="Ex.: o que preciso saber sobre o meu trabalho?"></div>
+        <div class="duas"><div class="campo"><label for="t-n">Cartas</label><select id="t-n"><option value="3">3 cartas: passado, presente e futuro</option><option value="5">5 cartas: leitura completa</option></select></div><div style="align-self:end"><button class="btn btn-pri" style="width:100%">Tirar as cartas</button></div></div></form>
+      <div class="msg" id="t-msg"></div><div id="t-res"></div></div>
+  </section>
+  <section data-painel="leituras" hidden><div id="lista-leituras"></div></section>
+  <section data-painel="plano" hidden><div class="cartao" id="meu-plano"></div><div class="planos" id="planos"></div></section>
+</main>
+<div class="modal" id="m-entrar" hidden role="dialog" aria-modal="true" aria-labelledby="m-tit"><div class="caixa"><button class="x" data-fechar aria-label="Fechar">×</button></div></div>
+<script>
+;(() => {
+  const $ = (q, r = document) => r.querySelector(q), $$ = (q, r = document) => [...r.querySelectorAll(q)]
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+  async function api(url, op = {}) {
+    const r = await fetch(url, { ...op, headers: { 'Content-Type': 'application/json', ...(op.headers || {}) } })
+    let j = {}; try { j = await r.json() } catch {}
+    if (r.status === 401) { location.href = '/?entrar=1'; throw new Error('entre de novo') }
+    if (!r.ok) { const e = new Error(typeof j.detail === 'string' ? j.detail : 'Não deu certo. Tente de novo.'); e.status = r.status; throw e }
+    return j
+  }
+  const post = (u, b) => api(u, { method: 'POST', body: JSON.stringify(b || {}) })
+  let CONTA = null
+  const NOMES = { destino: 'Destino', expressao: 'Expressão', alma: 'Alma', personalidade: 'Personalidade', ano_pessoal: 'Ano pessoal' }
+  const cartaHtml = (c) => `<div class="carta ${c.invertida ? 'inv' : ''}" title="${esc(c.sentido)}"><div>${esc(c.carta)}<small>${esc(c.posicao)}${c.invertida ? ' · invertida' : ''}</small></div></div>`
+  const mais = (err) => err.status === 402 ? ' <a href="#" data-ir="plano" style="color:var(--ac2)">Ver planos</a>' : ''
+
+  function abrir(nome) {
+    $$('[data-aba]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.aba === nome)))
+    $$('[data-painel]').forEach((p) => (p.hidden = p.dataset.painel !== nome))
+    history.replaceState(null, '', '#' + nome)
+    ;({ conversa: chat, mapa: mapa, leituras: leituras, plano: plano })[nome]?.()
+  }
+  $$('[data-aba]').forEach((b) => (b.onclick = () => abrir(b.dataset.aba)))
+  document.addEventListener('click', (e) => { const g = e.target.closest('[data-ir]'); if (g) { e.preventDefault(); abrir(g.dataset.ir) } })
+  $('#sair').onclick = async () => { await post('/api/sair'); location.href = '/' }
+
+  async function carregar() { CONTA = await api('/api/conta'); $('#aviso-perfil').hidden = !!CONTA.perfil }
+
+  async function chat() {
+    const { mensagens } = await api('/api/conversa')
+    $('#chat').innerHTML = mensagens.length ? mensagens.map((m) => `<div class="b ${m.papel}">${esc(m.texto)}</div>`).join('')
+      : '<div class="b ia">Oi! Eu sou a Astral AI. Me conte o que está no seu coração, ou toque numa das perguntas acima.</div>'
+    $('#chat').scrollTop = 1e9
+  }
+  async function enviar(t) {
+    if (!t) return
+    $('#chat').insertAdjacentHTML('beforeend', `<div class="b usuario">${esc(t)}</div><div class="b ia" id="pensando">Consultando as estrelas…</div>`); $('#chat').scrollTop = 1e9
+    $('#chat-msg').innerHTML = ''
+    try { const r = await post('/api/conversa', { texto: t }); $('#pensando').outerHTML = `<div class="b ia">${esc(r.resposta)}</div>` }
+    catch (err) { $('#pensando')?.remove(); $('#chat-msg').innerHTML = esc(err.message) + mais(err); $('#chat-msg').className = 'msg erro' }
+    $('#chat').scrollTop = 1e9
+  }
+  $('#f-chat').onsubmit = (e) => { e.preventDefault(); const t = $('#chat-txt').value.trim(); $('#chat-txt').value = ''; enviar(t) }
+  $$('.chips button').forEach((b) => (b.onclick = () => enviar(b.textContent)))
+  $('#carta-dia').onclick = async () => {
+    $('#chat').insertAdjacentHTML('beforeend', '<div class="b ia" id="pensando">Embaralhando…</div>')
+    try { const r = await post('/api/carta-do-dia'); $('#pensando').outerHTML = `<div class="b ia"><div class="cartas">${r.dados.cartas.map(cartaHtml).join('')}</div>${esc(r.texto)}</div>` }
+    catch (err) { $('#pensando')?.remove(); $('#chat-msg').textContent = err.message }
+    $('#chat').scrollTop = 1e9
+  }
+
+  async function mapa() {
+    await carregar()
+    const p = CONTA.perfil
+    if (p) { $('#p-nome').value = p.nome; $('#p-data').value = p.nascimento; $('#p-hora').value = p.hora; $('#p-cidade').value = p.cidade }
+    if (!p) { $('#meu-mapa').innerHTML = ''; return }
+    const n = p.numerologia
+    let h = `<div class="cartao"><h3 style="margin-bottom:12px">Sua numerologia</h3><div class="nums">${Object.keys(NOMES).map((k) => `<div><b>${n[k]}</b><small>${NOMES[k]}</small></div>`).join('')}</div>
+      <p class="dim" style="margin-top:12px">${esc(n.significados.destino)}</p></div>`
+    if (p.mapa) {
+      const m = p.mapa
+      h += `<div class="cartao"><div class="cab"><h3>Seu mapa astral</h3><button class="btn btn-pri" id="ler-mapa">Leitura completa do mapa</button></div>
+        <div class="planetas"><div><b>Ascendente</b><span>${esc(m.ascendente.signo)} ${m.ascendente.grau}°</span></div><div><b>Meio do Céu</b><span>${esc(m.meio_do_ceu.signo)} ${m.meio_do_ceu.grau}°</span></div>
+        ${Object.entries(m.planetas).map(([k, v]) => `<div><b>${esc(k)} · casa ${v.casa}</b><span>${esc(v.signo)} ${v.grau}°</span></div>`).join('')}</div>
+        <p class="dim" style="margin-top:12px;font-size:13px">Zodíaco tropical, casas por signo inteiro. Efemérides DE421 (NASA/JPL).</p><div class="msg" id="lm-msg"></div><div class="leitura" id="lm-res"></div></div>`
+    } else h += '<div class="cartao dim">Informe a hora e a cidade de nascimento para calcular o Ascendente e as casas.</div>'
+    $('#meu-mapa').innerHTML = h
+    $('#ler-mapa')?.addEventListener('click', async (e) => {
+      e.target.disabled = true; $('#lm-msg').textContent = 'A Astral AI está lendo o seu mapa…'
+      try { const r = await post('/api/leitura/mapa'); $('#lm-res').textContent = r.texto; $('#lm-msg').textContent = '' }
+      catch (err) { $('#lm-msg').innerHTML = esc(err.message) + mais(err); $('#lm-msg').className = 'msg erro' }
+      e.target.disabled = false
+    })
+  }
+  $('#f-perfil').onsubmit = async (e) => {
+    e.preventDefault(); $('#p-msg').textContent = 'Calculando…'; $('#p-msg').className = 'msg'
+    try { await post('/api/perfis', { principal: true, nome: $('#p-nome').value, nascimento: $('#p-data').value, hora: $('#p-hora').value, cidade: $('#p-cidade').value }); $('#p-msg').textContent = 'Pronto!'; mapa() }
+    catch (err) { $('#p-msg').textContent = err.message; $('#p-msg').className = 'msg erro' }
+  }
+
+  $('#f-tarot').onsubmit = async (e) => {
+    e.preventDefault(); $('#t-msg').textContent = 'Embaralhando e tirando as cartas…'; $('#t-msg').className = 'msg'; $('#t-res').innerHTML = ''
+    try { const r = await post('/api/tarot', { pergunta: $('#t-perg').value, cartas: +$('#t-n').value })
+      $('#t-msg').textContent = ''; $('#t-res').innerHTML = `<div class="cartas">${r.dados.cartas.map(cartaHtml).join('')}</div><div class="leitura">${esc(r.texto)}</div>` }
+    catch (err) { $('#t-msg').innerHTML = esc(err.message) + mais(err); $('#t-msg').className = 'msg erro' }
+  }
+
+  async function leituras() {
+    const { leituras } = await api('/api/leituras')
+    const T = { carta_do_dia: 'Carta do dia', tarot: 'Tarô', mapa: 'Mapa astral', sinastria: 'Sinastria' }
+    $('#lista-leituras').innerHTML = leituras.length ? leituras.map((l) => `<div class="cartao"><div class="cab"><b>${T[l.tipo] || l.tipo}${l.dados.pergunta ? ': ' + esc(l.dados.pergunta) : ''}</b><span class="dim">${new Date(l.criado * 1000).toLocaleString('pt-BR')}</span></div>
+      ${l.dados.cartas ? `<div class="cartas">${l.dados.cartas.map(cartaHtml).join('')}</div>` : ''}<div class="leitura">${esc(l.texto)}</div></div>`).join('')
+      : '<div class="cartao dim">Suas leituras aparecem aqui.</div>'
+  }
+  async function plano() {
+    await carregar()
+    $('#meu-plano').innerHTML = CONTA.plano ? `<b>Plano ${esc(CONTA.plano)}</b> ativo. Obrigado por estar com a gente.` : `<b>Plano grátis.</b> <span class="dim">Numerologia, carta do dia e ${CONTA.limite_gratis} mensagens por dia.</span>`
+    $('#planos').innerHTML = CONTA.planos.map((p, i) => `<div class="plano ${i === 0 ? 'destaque' : ''}"><h3>${esc(p.nome)}</h3><div class="preco">R$ ${p.preco.toFixed(2).replace('.', ',')}<small>/mês</small></div>
+      <ul>${p.itens.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${p.checkout ? `<a class="btn btn-pri" href="${esc(p.checkout)}">Assinar o ${esc(p.nome)}</a>` : '<button class="btn btn-sec" disabled>Em breve</button>'}</div>`).join('')
+  }
+  carregar().then(() => abrir((location.hash || '#conversa').slice(1)))
+})()
+</script>
+<script src="/s/login.js"></script>
+<script src="/s/olho.js"></script>
+</body>
+</html>
