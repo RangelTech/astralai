@@ -19,6 +19,7 @@ import threading
 from pathlib import Path
 
 import httpx
+from starlette.concurrency import run_in_threadpool
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -324,7 +325,7 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
         n = 5 if int(b.get("cartas") or 3) == 5 else 3
         pergunta = str(b.get("pergunta") or "").strip()[:400] or "Como está o meu caminho agora?"
         cartas = astro.tirar(n)
-        texto = chamar_llm([{"role": "system", "content": sistema(u)},
+        texto = await run_in_threadpool(chamar_llm, [{"role": "system", "content": sistema(u)},
                             {"role": "user", "content": f"Faça a leitura de tarô para a pergunta: \"{pergunta}\". Cartas tiradas (posição, carta, invertida): "
                                                         f"{json.dumps(cartas, ensure_ascii=False)}. Leia carta por carta e feche com uma síntese e um conselho."}], 1200)
         return guardar(u, "tarot", {"pergunta": pergunta, "cartas": cartas}, texto)
@@ -379,7 +380,7 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
         msgs.append({"role": "user", "content": texto})
         db.exec("INSERT INTO mensagens(usuario,papel,texto,criado) VALUES(?,?,?,?)", (u["id"], "usuario", texto, agora()))
         try:
-            resposta = chamar_llm(msgs)
+            resposta = await run_in_threadpool(chamar_llm, msgs)
         except Exception:  # noqa: BLE001
             raise HTTPException(502, "a IA não respondeu agora; tente de novo em instantes")
         db.exec("INSERT INTO mensagens(usuario,papel,texto,criado) VALUES(?,?,?,?)", (u["id"], "ia", resposta, agora()))
