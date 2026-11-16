@@ -1,4 +1,8 @@
-"""Astral AI: tarô, numerologia e mapa astral conversando com a IA (Hermes). API + páginas no mesmo serviço.
+"""Astral AI: guia espiritual por chat (tarô, baralho cigano, numerologia, astrologia e esoterismo) pela IA (Hermes).
+
+A guia lembra de tudo: cada pessoa tem uma MEMÓRIA (resumo atualizado pela IA a cada 4 mensagens) que vai no contexto
+junto com as últimas leituras, o céu do dia (calculado) e os dados de nascimento. A skill (skills/astral-ai.md) mora no
+banco e é editável no painel /admin (app/admin.py) sem deploy.
 
 Grátis: numerologia completa, carta do dia e um pouco de conversa por dia. Plus: conversa à vontade, tiragens de tarô,
 mapa astral completo e sinastria (compatibilidade). Os cálculos são feitos aqui (app/astro.py); a IA só interpreta.
@@ -11,6 +15,7 @@ import hmac
 import json
 import logging
 import os
+import threading
 from pathlib import Path
 
 import httpx
@@ -18,7 +23,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import astro, auth, mailer, senha_rotas
+from app import admin, astro, auth, mailer, senha_rotas
 from app.config import Config, carregar
 from app.db import Banco, agora
 
@@ -30,26 +35,32 @@ GRATIS_MSGS_DIA = 12
 
 PLANOS = {
     "plus": {"nome": "Plus", "preco": 29.90, "depois": 39.90,
-             "itens": ["Conversa sem limite com a IA", "Tarô de 3 e de 5 cartas", "Mapa astral completo", "Sinastria (compatibilidade)",
+             "itens": ["Conversa sem limite com a sua guia, que lembra de tudo", "Tarô de 3 e de 5 cartas", "Mapa astral completo", "Sinastria (compatibilidade)",
                        "Leituras guardadas no histórico"]},
     "premium": {"nome": "Premium", "preco": 59.90, "depois": 79.90,
                 "itens": ["Tudo do Plus", "Mapas e sinastrias para a família toda", "Previsão do mês pelo seu mapa",
                           "Ritual de limpeza energética guiado", "Atendimento prioritário"]},
 }
 
-PERSONA = """Você é a Astral AI, guia de tarô, numerologia e astrologia da Rangel Tech. Use a skill astral-ai.
-Fale em português do Brasil, com tom acolhedor e místico, mas claro e prático. Respostas curtas (até 8 linhas) a não ser que peçam uma leitura completa.
-Use SOMENTE os números, cartas e posições calculados que vierem no CONTEXTO; nunca invente posição de planeta, número ou carta.
-Não faça previsão de saúde, morte, gravidez ou resultado de exame; não dê conselho médico, jurídico ou financeiro definitivo: oriente a buscar um profissional.
-Se faltar dado de nascimento para o que pediram, peça de forma gentil (nome completo, data, hora e cidade).
-CONTEXTO:
+CABECA = """Você é a Astral AI, guia espiritual pessoal da Rangel Tech. Siga a skill astral-ai abaixo em tudo.
+=== SKILL astral-ai ===
+{skill}
+=== FIM DA SKILL ===
+CONTEXTO DA PESSOA:
 {contexto}"""
+RESUMIR = """Você mantém a memória de uma guia espiritual sobre a pessoa que conversa com ela.
+Reescreva a MEMÓRIA incluindo o que importa para as próximas conversas: nomes (parceiro, família, chefe, amigos),
+situações em andamento (amor, trabalho, dinheiro, família, emoções), sonhos contados, medos, metas, perguntas que se repetem,
+leituras feitas e conselhos dados, datas citadas. Tópicos curtos, no máximo 30 linhas. Responda só com a memória."""
+MEMORIA_A_CADA = 4
 
 
 def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
     cfg = cfg or carregar()
     os.makedirs(cfg.dados, exist_ok=True)
     db = Banco(os.path.join(cfg.dados, "astralai.db"))
+    admin.preparar(db)
+    db.con.executescript("CREATE TABLE IF NOT EXISTS memorias (usuario INTEGER PRIMARY KEY, texto TEXT NOT NULL, atualizado REAL NOT NULL);")
     app = FastAPI(title="Astral AI", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.cfg, app.state.db = cfg, db
 
@@ -134,6 +145,40 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
         return (f"Pessoa: {v['nome']}, nascida em {v['nascimento']}{' às ' + v['hora'] if v['hora'] else ''}{' em ' + v['cidade'] if v['cidade'] else ''}.\n"
                 f"Numerologia: destino {n.get('destino')}, expressão {n.get('expressao')}, alma {n.get('alma')}, personalidade {n.get('personalidade')}, ano pessoal {n.get('ano_pessoal')}.\n"
                 f"Mapa: {resumo_mapa(v['mapa'])}.\nPlano: {plano_de(u) or 'grátis'}.")
+
+    CEU: dict = {}
+
+    def ceu_de_hoje() -> str:
+        dia = dt.date.today().isoformat()
+        if dia not in CEU:
+            try:
+                m = astro.mapa(dt.datetime.now(dt.timezone.utc).replace(hour=15, minute=0, second=0, microsecond=0), -15.8, -47.9)
+                CEU.clear()
+                CEU[dia] = "; ".join(f"{n} em {p['signo']} {p['grau']}°" for n, p in m["planetas"].items())
+            except Exception:  # noqa: BLE001
+                return "indisponível"
+        return CEU[dia]
+
+    def sistema(u: dict) -> str:
+        mem = db.um("SELECT texto FROM memorias WHERE usuario=?", (u["id"],))
+        lei = db.todos("SELECT tipo, texto, criado FROM leituras WHERE usuario=? ORDER BY criado DESC LIMIT 4", (u["id"],))
+        ctx = (contexto(u) + f"\nHoje: {dt.date.today().strftime('%d/%m/%Y')}. CÉU DE HOJE: {ceu_de_hoje()}."
+               + f"\nMEMÓRIA (o que você já sabe desta pessoa):\n{mem['texto'] if mem else 'Ainda nada: é o começo da relação.'}"
+               + ("\nLEITURAS RECENTES:\n" + "\n".join(f"- {l['tipo']} em {dt.date.fromtimestamp(l['criado']).strftime('%d/%m')}: {l['texto'][:400]}" for l in lei) if lei else ""))
+        return CABECA.format(skill=admin.skill(db, "astral-ai"), contexto=ctx)
+
+    def atualizar_memoria(uid: int) -> None:
+        try:
+            mem = db.um("SELECT texto FROM memorias WHERE usuario=?", (uid,))
+            hist = db.todos("SELECT papel, texto FROM mensagens WHERE usuario=? ORDER BY criado DESC, id DESC LIMIT 24", (uid,))[::-1]
+            conversa = "\n".join(f"{'Pessoa' if m['papel'] == 'usuario' else 'Guia'}: {m['texto'][:600]}" for m in hist)
+            novo = chamar_llm([{"role": "system", "content": RESUMIR},
+                               {"role": "user", "content": f"MEMÓRIA ATUAL:\n{mem['texto'] if mem else '(vazia)'}\n\nCONVERSA RECENTE:\n{conversa}"}], 900)
+            if novo.strip():
+                db.exec("INSERT INTO memorias(usuario,texto,atualizado) VALUES(?,?,?) ON CONFLICT(usuario) DO UPDATE SET texto=excluded.texto, atualizado=excluded.atualizado",
+                        (uid, novo.strip()[:8000], agora()))
+        except Exception:  # noqa: BLE001
+            log.exception("memória não atualizada")
 
     def guardar(u: dict, tipo: str, dados: dict, texto: str) -> dict:
         lid = db.exec("INSERT INTO leituras(usuario,tipo,dados,texto,criado) VALUES(?,?,?,?,?)",
@@ -256,7 +301,7 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
         if ja:
             return {**ja, "dados": json.loads(ja["dados"])}
         cartas = astro.tirar(1, semente=f"{u['id']}:{dia}")
-        texto = chamar_llm([{"role": "system", "content": PERSONA.format(contexto=contexto(u))},
+        texto = chamar_llm([{"role": "system", "content": sistema(u)},
                             {"role": "user", "content": "Interprete a minha carta do dia em até 6 linhas, com um conselho prático para hoje. Carta: "
                                                         + json.dumps(cartas, ensure_ascii=False)}], 500)
         return guardar(u, "carta_do_dia", {"cartas": cartas}, texto)
@@ -269,7 +314,7 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
         n = 5 if int(b.get("cartas") or 3) == 5 else 3
         pergunta = str(b.get("pergunta") or "").strip()[:400] or "Como está o meu caminho agora?"
         cartas = astro.tirar(n)
-        texto = chamar_llm([{"role": "system", "content": PERSONA.format(contexto=contexto(u))},
+        texto = chamar_llm([{"role": "system", "content": sistema(u)},
                             {"role": "user", "content": f"Faça a leitura de tarô para a pergunta: \"{pergunta}\". Cartas tiradas (posição, carta, invertida): "
                                                         f"{json.dumps(cartas, ensure_ascii=False)}. Leia carta por carta e feche com uma síntese e um conselho."}], 1200)
         return guardar(u, "tarot", {"pergunta": pergunta, "cartas": cartas}, texto)
@@ -281,7 +326,7 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
         p = perfil_principal(u)
         if not p or not p["mapa"]:
             raise HTTPException(422, "informe a hora e a cidade de nascimento para calcular o mapa")
-        texto = chamar_llm([{"role": "system", "content": PERSONA.format(contexto=contexto(u))},
+        texto = chamar_llm([{"role": "system", "content": sistema(u)},
                             {"role": "user", "content": "Faça a leitura completa do meu mapa astral: Sol, Lua e Ascendente primeiro, depois os planetas "
                                                         "pessoais, o equilíbrio dos elementos e um fechamento sobre propósito. Use títulos curtos."}], 1800)
         return guardar(u, "mapa", {"mapa": json.loads(p["mapa"])}, texto)
@@ -296,7 +341,7 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
         a, b2 = vista_perfil(eu), vista_perfil(outro)
         dados = {"pessoa1": {"nome": a["nome"], "numerologia": a["numerologia"], "mapa": resumo_mapa(a["mapa"])},
                  "pessoa2": {"nome": b2["nome"], "numerologia": b2["numerologia"], "mapa": resumo_mapa(b2["mapa"])}}
-        texto = chamar_llm([{"role": "system", "content": PERSONA.format(contexto=contexto(u))},
+        texto = chamar_llm([{"role": "system", "content": sistema(u)},
                             {"role": "user", "content": "Faça a sinastria (compatibilidade) entre estas duas pessoas: pontos de encontro, atritos e como cuidar "
                                                         f"da relação. Dados calculados: {json.dumps(dados, ensure_ascii=False)}"}], 1500)
         return guardar(u, "sinastria", dados, texto)
@@ -319,7 +364,7 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
             if usadas >= GRATIS_MSGS_DIA:
                 raise HTTPException(402, f"as {GRATIS_MSGS_DIA} mensagens grátis de hoje acabaram; com o Plus a conversa é sem limite")
         hist = db.todos("SELECT papel, texto FROM mensagens WHERE usuario=? ORDER BY criado DESC, id DESC LIMIT 16", (u["id"],))[::-1]
-        msgs = [{"role": "system", "content": PERSONA.format(contexto=contexto(u))}]
+        msgs = [{"role": "system", "content": sistema(u)}]
         msgs += [{"role": "user" if m["papel"] == "usuario" else "assistant", "content": m["texto"]} for m in hist]
         msgs.append({"role": "user", "content": texto})
         db.exec("INSERT INTO mensagens(usuario,papel,texto,criado) VALUES(?,?,?,?)", (u["id"], "usuario", texto, agora()))
@@ -328,6 +373,9 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
         except Exception:  # noqa: BLE001
             raise HTTPException(502, "a IA não respondeu agora; tente de novo em instantes")
         db.exec("INSERT INTO mensagens(usuario,papel,texto,criado) VALUES(?,?,?,?)", (u["id"], "ia", resposta, agora()))
+        n = db.um("SELECT COUNT(*) n FROM mensagens WHERE usuario=? AND papel='usuario'", (u["id"],))["n"]
+        if n % MEMORIA_A_CADA == 0:
+            (atualizar_memoria(u["id"]) if llm else threading.Thread(target=atualizar_memoria, args=(u["id"],), daemon=True).start())
         return {"resposta": resposta}
 
     # ------------------------------------------------ Cakto
@@ -365,6 +413,13 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
         return {"ok": True, "ignorado": evento}
 
     # ------------------------------------------------ páginas
+    app.include_router(admin.rotas(db, cfg.segredo_sessao, """SELECT u.email, u.criado, a.plano, a.ativo_ate, (a.ativo_ate > strftime('%s','now')) ativo
+        FROM usuarios u LEFT JOIN assinaturas a ON a.usuario=u.id ORDER BY u.criado DESC""", seguro=not cfg.dev))
+
+    @app.get("/admin", response_class=HTMLResponse)
+    def pagina_admin():
+        return FileResponse(ESTATICO / "admin.html")
+
     app.mount("/s", StaticFiles(directory=ESTATICO), name="estatico")
 
     @app.get("/", response_class=HTMLResponse)
