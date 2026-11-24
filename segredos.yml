@@ -1,0 +1,16 @@
+# Só NOMES das variáveis. Os valores ficam no Infisical (nunca no git). Spec 57, seção 0A.2.
+infisical:
+  projeto: rt-produtos
+  pasta: astralai
+  ambiente: prod
+segredos:
+  - ASTRALAI_ADMIN_KEY
+  - ASTRALAI_CAKTO_SEGREDO
+  - ASTRALAI_DEMO_SENHA
+  - ASTRALAI_LLM_KEY
+  - ASTRALAI_SEGREDO_SESSAO
+  - ASTRALAI_SMTP_FROM
+  - SMTP_HOST
+  - SMTP_PASSWORD
+  - SMTP_PORT
+  - SMTP_USER
