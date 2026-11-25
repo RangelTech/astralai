@@ -25,7 +25,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import admin, astro, auth, mailer, senha_rotas
-from produtos_core import acesso
+from produtos_core import acesso, armazenamento
 from app.config import Config, carregar
 from app.db import Banco, agora
 
@@ -216,6 +216,7 @@ def criar_app(cfg: Config | None = None, llm=None, geocod=None) -> FastAPI:
                      login=_login, usuario=usuario, criar_usuario=lambda email: auth.usuario_por_email(db, email),
                      produto="Astral AI", base_url=cfg.base_url, destino="/painel", cor="#7c5cff",
                      demo_email=lambda: cfg.demo_email, demo_senha=lambda: cfg.demo_senha, dev=cfg.dev)  # cadastro e login comuns (spec 57 §5A)
+    armazenamento.registrar(app, armazenamento.Armazenamento(pasta_local=os.path.join(getattr(cfg, "dados", "") or ".", "arquivos")))  # MinIO (spec 57 §8.6)
 
     @app.post("/api/sair")
     def sair(request: Request):
