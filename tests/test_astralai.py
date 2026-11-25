@@ -1,4 +1,5 @@
 import datetime as dt
+from produtos_core.teste import entrar
 import os
 
 os.environ["ASTRALAI_SEM_APP"] = "1"
@@ -27,8 +28,7 @@ def amb(tmp_path):
     cfg = Config(dados=str(tmp_path), segredo_sessao="s", dev=True, cakto_segredo="ck", planos_por_produto={"p-plus": "plus"})
     app = criar_app(cfg, llm=llm_falso, geocod=geo_falso)
     c = TestClient(app)
-    cod = c.post("/api/entrar/codigo", json={"email": "ana@x.com"}).json()["codigo_dev"]
-    assert c.post("/api/entrar", json={"email": "ana@x.com", "codigo": cod}).status_code == 200
+    entrar(c, "ana@x.com")
     return c, app
 
 
@@ -115,8 +115,7 @@ def test_admin_login_e_skill(tmp_path):
     a.put("/api/painel/skills/astral-ai", json={"conteudo": "SKILL NOVA DO LUCAS"})
     s = a.get("/api/painel/skills/astral-ai").json()
     assert s["conteudo"] == "SKILL NOVA DO LUCAS" and len(s["historico"]) == 1 and s["por"] == "painel"
-    cod = a.post("/api/entrar/codigo", json={"email": "z@x.com"}).json()["codigo_dev"]
-    a.post("/api/entrar", json={"email": "z@x.com", "codigo": cod})
+    entrar(a, "z@x.com")
     a.post("/api/conversa", json={"texto": "oi"})
     assert "SKILL NOVA DO LUCAS" in vistos[-1][0]["content"]
     assert a.post("/api/painel/skills/astral-ai/restaurar").json()["ok"] and "baralho cigano" in a.get("/api/painel/skills/astral-ai").json()["conteudo"].lower()
