@@ -3,4 +3,4 @@ uvicorn==0.32.1
 httpx==0.28.1
 skyfield==1.49
 tzdata==2025.2
-produtos-core @ https://github.com/RangelTech/produtos-core/archive/refs/tags/v0.1.20.tar.gz
+produtos-core @ https://github.com/RangelTech/produtos-core/archive/refs/tags/v0.1.21.tar.gz
